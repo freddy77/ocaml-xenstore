@@ -36,6 +36,8 @@ val maxtransaction : int ref
 val maxwatchevent : int ref
 (** The current global maximum number of outstanding watch events *)
 
+val generation_overrides : int64 ref
+
 type overrides
 
 val maxent_overrides : overrides
@@ -94,6 +96,9 @@ val get : t -> int -> int
 
 val list : t -> (int * int) list
 (** [list t] returns all (domid, entry count) pairs *)
+
+val generation : t -> int64
+(** [generation] returns the generation associated with quota *)
 
 val incr : t -> int -> unit
 (** [incr t domid] adds an entry to [domid] *)

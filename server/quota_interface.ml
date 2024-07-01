@@ -80,7 +80,9 @@ let write _t _creator perms path value =
         (Some (int_of_string value))
   | _ -> Store.Path.doesnt_exist path
 
-let list_raw t perms path =
+let add_generation ls = (ls, !Quota.generation_overrides)
+
+let list t perms path =
   Perms.has perms Perms.CONFIGURE;
   match Store.Path.to_string_list path with
   | [] ->
@@ -92,6 +94,7 @@ let list_raw t perms path =
       ; "number-of-active-transactions"
       ; "number-of-queued-watch-events"
       ]
+      |> add_generation
   | [ "default" ] ->
       [
         "number-of-entries"
@@ -100,24 +103,24 @@ let list_raw t perms path =
       ; "number-of-active-transactions"
       ; "number-of-queued-watch-events"
       ]
+      |> add_generation
   | [ "entries-per-domain" ] ->
       let q = t.Transaction.store.Store.quota in
-      Quota.list q |> List.map fst |> List.map string_of_int
+      ( Quota.list q |> List.map fst |> List.map string_of_int
+      , Quota.generation q )
   | [ "number-of-entries" ] ->
       Quota.list_overrides Quota.maxent_overrides
-      |> List.map fst |> List.map string_of_int
+      |> List.map fst |> List.map string_of_int |> add_generation
   | [ "number-of-registered-watches" ] ->
       Quota.list_overrides Quota.maxwatch_overrides
-      |> List.map fst |> List.map string_of_int
+      |> List.map fst |> List.map string_of_int |> add_generation
   | [ "number-of-active-transactions" ] ->
       Quota.list_overrides Quota.maxtransaction_overrides
-      |> List.map fst |> List.map string_of_int
+      |> List.map fst |> List.map string_of_int |> add_generation
   | [ "number-of-queued-watch-events" ] ->
       Quota.list_overrides Quota.maxwatchevent_overrides
-      |> List.map fst |> List.map string_of_int
-  | _ -> []
-
-let list t perms path = (list_raw t perms path, Int64.one) (* TODO gen *)
+      |> List.map fst |> List.map string_of_int |> add_generation
+  | _ -> ([], Int64.one)
 
 let rm _t perms path =
   Perms.has perms Perms.CONFIGURE;

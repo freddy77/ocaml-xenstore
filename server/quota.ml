@@ -33,6 +33,7 @@ let maxent_overrides = Hashtbl.create 10
 let maxwatch_overrides = Hashtbl.create 10
 let maxtransaction_overrides = Hashtbl.create 10
 let maxwatchevent_overrides = Hashtbl.create 10
+let generation_overrides = ref Int64.zero
 
 let get_override t domid =
   if Hashtbl.mem t domid then Some (Hashtbl.find t domid) else None
@@ -40,7 +41,9 @@ let get_override t domid =
 let set_override t domid override =
   match override with
   | None -> Hashtbl.remove t domid
-  | Some override -> Hashtbl.replace t domid override
+  | Some override ->
+      Hashtbl.replace t domid override;
+      generation_overrides := Int64.succ !generation_overrides
 
 let list_overrides t = Hashtbl.fold (fun domid x acc -> (domid, x) :: acc) t []
 
@@ -52,10 +55,13 @@ let maxwatch_of_domain = of_domain maxwatch_overrides maxwatch
 let maxtransaction_of_domain = of_domain maxtransaction_overrides maxtransaction
 let maxwatchevent_of_domain = of_domain maxwatchevent_overrides maxwatchevent
 
-type t = { cur : (domid, int) Hashtbl.t (* current domains entry usage *) }
+type t = {
+    cur : (domid, int) Hashtbl.t (* current domains entry usage *)
+  ; mutable generation : int64
+}
 
-let create () = { cur = Hashtbl.create 100 }
-let copy quota = { cur = Hashtbl.copy quota.cur }
+let create () = { cur = Hashtbl.create 100; generation = 0L }
+let copy quota = { cur = Hashtbl.copy quota.cur; generation = quota.generation }
 
 (*let del quota id = Hashtbl.remove quota.cur id*)
 
@@ -67,10 +73,13 @@ let check _quota id size =
 let list quota =
   Hashtbl.fold (fun domid x acc -> (domid, x) :: acc) quota.cur []
 
+let generation quota = quota.generation
+
 let get quota id =
   if Hashtbl.mem quota.cur id then Hashtbl.find quota.cur id else 0
 
 let set quota id nb =
+  quota.generation <- Int64.succ quota.generation;
   if nb = 0 then Hashtbl.remove quota.cur id
   else if Hashtbl.mem quota.cur id then Hashtbl.replace quota.cur id nb
   else Hashtbl.add quota.cur id nb

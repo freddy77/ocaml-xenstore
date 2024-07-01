@@ -33,6 +33,7 @@ and t = {
   ; transactions : (int32, Transaction.t) Hashtbl.t
   ; mutable next_tid : int32
   ; watches : (Store.Name.t, watch list) Hashtbl.t
+  ; mutable generation : int64
   ; mutable nb_watches : int
   ; mutable nb_dropped_watches : int
   ; mutable stat_nb_ops : int
@@ -99,6 +100,7 @@ let create address interface =
     ; transactions = Hashtbl.create 5
     ; next_tid = 1l
     ; watches = Hashtbl.create 8
+    ; generation = Int64.zero
     ; nb_watches = 0
     ; nb_dropped_watches = 0
     ; stat_nb_ops = 0
@@ -132,6 +134,7 @@ let add_watch con name token =
   let watch = watch_create ~con ~token ~name in
   Hashtbl.replace con.watches name (watch :: l);
   con.nb_watches <- con.nb_watches + 1;
+  con.generation <- Int64.succ con.generation;
 
   (watches :=
      let key =
@@ -149,6 +152,7 @@ let del_watch con name token =
   if List.length filtered > 0 then Hashtbl.replace con.watches name filtered
   else Hashtbl.remove con.watches name;
   con.nb_watches <- con.nb_watches - 1;
+  con.generation <- Int64.succ con.generation;
 
   watches :=
     let key =
@@ -362,12 +366,10 @@ module Interface = struct
           ]
         in
         (l, Int64.one)
-        (* TODO generation *)
     | [ "watch" ] ->
         let all = Hashtbl.fold (fun _ w acc -> w @ acc) c.watches [] in
         let l = List.map string_of_int (between 0 (List.length all - 1)) in
-        (l, Int64.one)
-        (* TODO generation *)
+        (l, c.generation)
     | [ "watch"; _ ] -> ([ "name"; "token"; "total-events" ], Int64.one)
     | "backend" :: rest -> (
         match c.interface with

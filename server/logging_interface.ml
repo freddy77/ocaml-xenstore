@@ -44,7 +44,9 @@ let write _t _creator perms path value =
   Perms.has perms Perms.CONFIGURE;
   let f list value key =
     match value with
-    | "1" -> if not (List.mem key !list) then list := key :: !list
+    | "1" ->
+        if not (List.mem key !list) then list := key :: !list;
+        new_generation ()
     | _ -> raise (Invalid_argument value)
   in
   match Store.Path.to_string_list path with
@@ -57,22 +59,26 @@ let write _t _creator perms path value =
         := match value with "1" -> true | _ -> raise (Invalid_argument value))
   | _ -> Store.Path.doesnt_exist path
 
-let list_raw _t perms path =
+let list _t perms path =
   Perms.has perms Perms.CONFIGURE;
   match Store.Path.to_string_list path with
   | [] ->
-      [ "request"; "reply-ok"; "reply-err" ]
-      @ List.map fst (List.filter (fun (_, b) -> !b) general_params)
-  | "request" :: [] -> !disable_request
-  | "reply-ok" :: [] -> !disable_reply_ok
-  | "reply-err" :: [] -> !disable_reply_err
-  | _ -> []
-
-let list t perms path = (list_raw t perms path, Int64.one) (* TODO gen *)
+      let l =
+        [ "request"; "reply-ok"; "reply-err" ]
+        @ List.map fst (List.filter (fun (_, b) -> !b) general_params)
+      in
+      (l, Int64.one)
+  | "request" :: [] -> (!disable_request, !generation)
+  | "reply-ok" :: [] -> (!disable_reply_ok, !generation)
+  | "reply-err" :: [] -> (!disable_reply_err, !generation)
+  | _ -> ([], Int64.one)
 
 let rm _t perms path =
   Perms.has perms Perms.CONFIGURE;
-  let f list key = list := List.filter (fun x -> x <> key) !list in
+  let f list key =
+    list := List.filter (fun x -> x <> key) !list;
+    new_generation ()
+  in
   match Store.Path.to_string_list path with
   | [ "request"; x ] -> f disable_request x
   | [ "reply-ok"; x ] -> f disable_reply_ok x

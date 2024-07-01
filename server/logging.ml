@@ -131,6 +131,8 @@ let disable_commit = ref false
 let disable_newconn = ref false
 let disable_endconn = ref false
 let disable_transaction = ref false
+let generation = ref Int64.zero
+let new_generation () = generation := Int64.succ !generation
 let disable_request = ref [ "read" ]
 
 let disable_reply_ok =
