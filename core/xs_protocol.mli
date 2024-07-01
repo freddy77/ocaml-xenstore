@@ -39,7 +39,9 @@ module Op : sig
     | Isintroduced
     | Resume
     | Set_target
-    | Restrict  (** The type of xenstore operation. *)
+    | Restrict
+    | Reset_watches
+    | Directory_part  (** The type of xenstore operation. *)
 
   val to_string : t -> string
   val of_int32 : int32 -> t option
@@ -163,6 +165,7 @@ module Response : sig
     | Isintroduced of bool
     | Error of string
     | Watchevent of string * string
+    | Directory_part of string list
 
   val ty_of_payload : payload -> Op.t
   val prettyprint_payload : payload -> string
@@ -195,6 +198,7 @@ module Request : sig
     | Isintroduced of int
     | Error of string
     | Watchevent of string
+    | Directory_part of string * string
 
   val ty_of_payload : payload -> Op.t
   val prettyprint_payload : payload -> string

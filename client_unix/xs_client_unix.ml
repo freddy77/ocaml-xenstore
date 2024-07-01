@@ -301,8 +301,11 @@ functor
         with_mutex c.m (fun () -> Hashtbl.remove c.rid_to_wakeup rid);
         response hint request res unmarshal)
 
+    let rpc_dir hint h payload unmarshal =
+      try rpc hint h payload unmarshal with Error "E2BIG" -> [ "mao" ]
+
     let directory h path =
-      rpc "directory"
+      rpc_dir "directory"
         (Xs_handle.accessed_path h path)
         Request.(PathOp (path, Directory))
         Unmarshal.list

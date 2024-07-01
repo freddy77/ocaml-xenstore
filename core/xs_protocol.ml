@@ -38,6 +38,8 @@ module Op = struct
     | Resume
     | Set_target
     | Restrict
+    | Reset_watches
+    | Directory_part
 
   (* The index of the value in the array is the integer representation used
      by the wire protocol. Every element of t exists exactly once in the array. *)
@@ -64,6 +66,8 @@ module Op = struct
      ; Resume
      ; Set_target
      ; Restrict
+     ; Reset_watches
+     ; Directory_part
     |]
 
   let of_int32 i =
@@ -105,6 +109,8 @@ module Op = struct
     | Resume -> "resume"
     | Set_target -> "set_target"
     | Restrict -> "restrict"
+    | Reset_watches -> "reset_watches"
+    | Directory_part -> "directory_part"
 end
 
 let split_string ~limit c s =
@@ -376,6 +382,7 @@ module Response = struct
     | Isintroduced of bool
     | Error of string
     | Watchevent of string * string
+    | Directory_part of string list
 
   let prettyprint_payload =
     let open Printf in
@@ -401,6 +408,8 @@ module Response = struct
     | Isintroduced x -> sprintf "Isintroduced %b" x
     | Error x -> sprintf "Error %s" x
     | Watchevent (x, y) -> sprintf "Watchevent %s %s" x y
+    | Directory_part xs ->
+        sprintf "Directory_part [ %s ]" (String.concat "; " xs)
 
   let ty_of_payload = function
     | Read _ -> Op.Read
@@ -424,6 +433,7 @@ module Response = struct
     | Release -> Op.Release
     | Set_target -> Op.Set_target
     | Restrict -> Op.Restrict
+    | Directory_part _ -> Op.Directory_part
 
   let ok = "OK\000"
 
@@ -468,6 +478,7 @@ module Request = struct
     | Isintroduced of int
     | Error of string
     | Watchevent of string
+    | Directory_part of string * string
 
   open Printf
 
@@ -496,6 +507,7 @@ module Request = struct
     | Isintroduced x -> sprintf "Isintroduced %d" x
     | Error x -> sprintf "Error %s" x
     | Watchevent x -> sprintf "Watchevent %s" x
+    | Directory_part (x, y) -> sprintf "Directory_part %s %s" x y
 
   exception Parse_failure
 
@@ -537,6 +549,8 @@ module Request = struct
     match get_ty request with
     | Op.Read -> PathOp (data |> one_string, Read)
     | Op.Directory -> PathOp (data |> one_string, Directory)
+    | Op.Directory_part -> PathOp (data |> one_string, Directory)
+    | Op.Reset_watches -> PathOp (data |> one_string, Directory)
     | Op.Getperms -> PathOp (data |> one_string, Getperms)
     | Op.Getdomainpath -> Getdomainpath (data |> one_string |> domid)
     | Op.Transaction_start -> Transaction_start
@@ -607,6 +621,7 @@ module Request = struct
     | Isintroduced _ -> Op.Isintroduced
     | Error _ -> Op.Error
     | Watchevent _ -> Op.Watchevent
+    | Directory_part _ -> Op.Directory_part
 
   let transactional_of_payload = function
     | PathOp (_, _) | Transaction_end _ -> true
@@ -638,6 +653,7 @@ module Request = struct
         data_concat [ Printf.sprintf "%u" mine; Printf.sprintf "%u" yours ]
     | Error _ -> failwith "Unimplemented: data_of_payload (Error)"
     | Watchevent _ -> failwith "Unimplemented: data_of_payload (Watchevent)"
+    | Directory_part (path, offset) -> data_concat [ path; offset ]
 
   let print x tid rid =
     create
