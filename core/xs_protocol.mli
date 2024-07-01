@@ -165,7 +165,7 @@ module Response : sig
     | Isintroduced of bool
     | Error of string
     | Watchevent of string * string
-    | Directory_part of string list
+    | Directory_part of string list * int64
 
   val ty_of_payload : payload -> Op.t
   val prettyprint_payload : payload -> string

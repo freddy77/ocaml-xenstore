@@ -24,6 +24,7 @@ module Node = struct
     ; perms : Xs_protocol.ACL.t
     ; value : string
     ; children : t list
+    ; generation : int64
   }
 
   let create _name _creator _perms _value =
@@ -33,6 +34,7 @@ module Node = struct
     ; perms = _perms
     ; value = _value
     ; children = []
+    ; generation = 0L
     }
 
   let get_creator node = node.creator
@@ -42,7 +44,13 @@ module Node = struct
 
   let set_perms node nperms = { node with perms = nperms }
   let get_perms node = node.perms
-  let add_child node child = { node with children = child :: node.children }
+
+  let add_child node child =
+    {
+      node with
+      children = child :: node.children
+    ; generation = Int64.succ node.generation
+    }
 
   let exists node childname =
     let childname = Symbol.of_string childname in
@@ -60,7 +68,11 @@ module Node = struct
       | h :: tl when h.name = child.name -> nchild :: tl
       | h :: tl -> h :: (replace_one_in_list [@tailcall]) tl
     in
-    { node with children = replace_one_in_list node.children }
+    {
+      node with
+      children = replace_one_in_list node.children
+    ; generation = Int64.succ node.generation
+    }
 
   let del_childname node childname =
     let sym = Symbol.of_string childname in
@@ -70,9 +82,14 @@ module Node = struct
       | h :: tl when h.name = sym -> tl
       | h :: tl -> h :: (delete_one_in_list [@tailcall]) tl
     in
-    { node with children = delete_one_in_list node.children }
+    {
+      node with
+      children = delete_one_in_list node.children
+    ; generation = Int64.succ node.generation
+    }
 
-  let del_all_children node = { node with children = [] }
+  let del_all_children node =
+    { node with children = []; generation = Int64.succ node.generation }
 
   let rec recurse fct node =
     fct node;
@@ -341,19 +358,22 @@ let read store perm path =
 
 let ls store perm path =
   try
-    let children =
-      if path = [] then store.root.Node.children
+    let node =
+      if path = [] then store.root
       else
         let do_ls node name =
           let cnode =
             try Node.find node name with Not_found -> Path.doesnt_exist path
           in
           Perms.check perm Perms.READ cnode.Node.perms;
-          cnode.Node.children
+          cnode
         in
         Path.apply store.root path do_ls
     in
-    List.rev (List.map (fun n -> Symbol.to_string n.Node.name) children)
+    let l =
+      List.rev (List.map (fun n -> Symbol.to_string n.Node.name) node.children)
+    in
+    (l, node.generation)
   with Not_found -> Path.doesnt_exist path
 
 let getperms store perm path =

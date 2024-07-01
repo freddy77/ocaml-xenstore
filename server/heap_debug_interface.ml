@@ -22,5 +22,5 @@ let exists t perms path =
 let list _t perms path =
   Perms.has perms Perms.CONFIGURE;
   match Store.Path.to_string_list path with
-  | [] -> [ "heap_words"; "live_words"; "free_words"; "symbols" ]
-  | _ -> []
+  | [] -> ([ "heap_words"; "live_words"; "free_words"; "symbols" ], Int64.one)
+  | _ -> ([], Int64.one)

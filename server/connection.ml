@@ -43,6 +43,7 @@ and t = {
 }
 
 let by_address : (Xs_protocol.address, t) Hashtbl.t = Hashtbl.create 128
+let generation = ref Int64.zero
 let by_index : (int, t) Hashtbl.t = Hashtbl.create 128
 let watches : (string, watch list) Trie.t ref = ref (Trie.create ())
 
@@ -60,7 +61,7 @@ let list_of_watches () =
 let watch_create ~con ~name ~token = { con; token; name; count = 0 }
 let get_con w = w.con
 let number_of_transactions con = Hashtbl.length con.transactions
-let anon_id_next = ref 1
+let new_generation () = generation := Int64.succ !generation
 
 let destroy address =
   try
@@ -74,6 +75,7 @@ let destroy address =
           | ws -> Some ws)
         !watches;
     Hashtbl.remove by_address address;
+    new_generation ();
     Hashtbl.remove by_index c.idx
   with Not_found ->
     error "Failed to remove connection for: %s"
@@ -109,6 +111,7 @@ let create address interface =
   incr counter;
   Logging.new_connection ~tid:Transaction.none ~con:con.domstr;
   Hashtbl.replace by_address address con;
+  new_generation ();
   Hashtbl.replace by_index con.idx con;
   con
 
@@ -347,45 +350,53 @@ module Interface = struct
 
   let list_connection t perms c = function
     | [] ->
-        [
-          "address"
-        ; "current-transactions"
-        ; "total-operations"
-        ; "watch"
-        ; "current-watch-queue-length"
-        ; "total-dropped-watches"
-        ; "backend"
-        ]
+        let l =
+          [
+            "address"
+          ; "current-transactions"
+          ; "total-operations"
+          ; "watch"
+          ; "current-watch-queue-length"
+          ; "total-dropped-watches"
+          ; "backend"
+          ]
+        in
+        (l, Int64.one)
+        (* TODO generation *)
     | [ "watch" ] ->
         let all = Hashtbl.fold (fun _ w acc -> w @ acc) c.watches [] in
-        List.map string_of_int (between 0 (List.length all - 1))
-    | [ "watch"; _ ] -> [ "name"; "token"; "total-events" ]
+        let l = List.map string_of_int (between 0 (List.length all - 1)) in
+        (l, Int64.one)
+        (* TODO generation *)
+    | [ "watch"; _ ] -> ([ "name"; "token"; "total-events" ], Int64.one)
     | "backend" :: rest -> (
         match c.interface with
-        | None -> []
+        | None -> ([], Int64.zero)
         | Some i ->
             let module I = (val i : Namespace.IO) in
             I.list t perms (Store.Path.of_string_list rest))
-    | _ -> []
+    | _ -> ([], Int64.one)
 
   let list t perms path =
     Perms.has perms Perms.CONFIGURE;
     match Store.Path.to_string_list path with
-    | [] -> [ "socket"; "domain" ]
+    | [] -> ([ "socket"; "domain" ], Int64.one)
     | [ "socket" ] ->
-        Hashtbl.fold
-          (fun x c acc ->
-            match x with
-            | Xs_protocol.Unix _ -> string_of_int c.idx :: acc
-            | _ -> acc)
-          by_address []
+        ( Hashtbl.fold
+            (fun x c acc ->
+              match x with
+              | Xs_protocol.Unix _ -> string_of_int c.idx :: acc
+              | _ -> acc)
+            by_address []
+        , !generation )
     | [ "domain" ] ->
-        Hashtbl.fold
-          (fun x _ acc ->
-            match x with
-            | Xs_protocol.Domain x -> string_of_int x :: acc
-            | _ -> acc)
-          by_address []
+        ( Hashtbl.fold
+            (fun x _ acc ->
+              match x with
+              | Xs_protocol.Domain x -> string_of_int x :: acc
+              | _ -> acc)
+            by_address []
+        , !generation )
     | "domain" :: domid :: rest ->
         let address = Xs_protocol.Domain (int_of_string domid) in
         if not (Hashtbl.mem by_address address) then
@@ -397,5 +408,5 @@ module Interface = struct
         if not (Hashtbl.mem by_index idx) then Store.Path.doesnt_exist path;
         let c = Hashtbl.find by_index idx in
         list_connection t perms c rest
-    | _ -> []
+    | _ -> ([], Int64.one)
 end

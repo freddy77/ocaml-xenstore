@@ -115,7 +115,7 @@ val write : t -> int -> Perms.t -> Path.t -> string -> unit
 val mkdir : t -> int -> Perms.t -> Path.t -> unit
 val setperms : t -> Perms.t -> Path.t -> Xs_protocol.ACL.t -> unit
 val rm : t -> Perms.t -> Path.t -> unit
-val ls : t -> Perms.t -> Path.t -> string list
+val ls : t -> Perms.t -> Path.t -> string list * int64
 val read : t -> Perms.t -> Path.t -> string
 val getperms : t -> Perms.t -> Path.t -> Xs_protocol.ACL.t
 val set_node : t -> Path.t -> Node.t -> Quota.t -> Quota.t -> unit

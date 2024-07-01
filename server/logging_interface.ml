@@ -57,7 +57,7 @@ let write _t _creator perms path value =
         := match value with "1" -> true | _ -> raise (Invalid_argument value))
   | _ -> Store.Path.doesnt_exist path
 
-let list _t perms path =
+let list_raw _t perms path =
   Perms.has perms Perms.CONFIGURE;
   match Store.Path.to_string_list path with
   | [] ->
@@ -67,6 +67,8 @@ let list _t perms path =
   | "reply-ok" :: [] -> !disable_reply_ok
   | "reply-err" :: [] -> !disable_reply_err
   | _ -> []
+
+let list t perms path = (list_raw t perms path, Int64.one) (* TODO gen *)
 
 let rm _t perms path =
   Perms.has perms Perms.CONFIGURE;

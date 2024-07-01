@@ -78,7 +78,7 @@ let op_exn _store c t (payload : Request.payload) : Response.payload =
           let v = Impl.read t c.Connection.perm path in
           Response.Read v
       | Directory ->
-          let entries = Impl.list t c.Connection.perm path in
+          let entries, _generation = Impl.list t c.Connection.perm path in
           Response.Directory entries
       | Getperms ->
           let v = Impl.getperms t c.Connection.perm path in
@@ -102,9 +102,9 @@ let op_exn _store c t (payload : Request.payload) : Response.payload =
 
       let path, m = get_namespace_implementation path in
       let module Impl = (val m : Namespace.IO) in
-      let entries = Impl.list t c.Connection.perm path in
+      let entries, generation = Impl.list t c.Connection.perm path in
       (* TODO truncate, consider offset *)
-      Response.Directory_part entries
+      Response.Directory_part (entries, generation)
 
 (* Replay a stored transaction against a fresh store, check the responses are
    all equivalent: if so, commit the transaction. Otherwise send the abort to

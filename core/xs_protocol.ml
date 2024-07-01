@@ -382,7 +382,7 @@ module Response = struct
     | Isintroduced of bool
     | Error of string
     | Watchevent of string * string
-    | Directory_part of string list
+    | Directory_part of string list * int64
 
   let prettyprint_payload =
     let open Printf in
@@ -408,8 +408,8 @@ module Response = struct
     | Isintroduced x -> sprintf "Isintroduced %b" x
     | Error x -> sprintf "Error %s" x
     | Watchevent (x, y) -> sprintf "Watchevent %s %s" x y
-    | Directory_part xs ->
-        sprintf "Directory_part [ %s ]" (String.concat "; " xs)
+    | Directory_part (xs, gen) ->
+        sprintf "Directory_part [ %s ] %Ld" (String.concat "; " xs) gen
 
   let ty_of_payload = function
     | Read _ -> Op.Read
@@ -447,6 +447,9 @@ module Response = struct
     | Isintroduced b -> data_concat [ (if b then "T" else "F") ]
     | Watchevent (path, token) -> data_concat [ path; token ]
     | Error x -> data_concat [ x ]
+    | Directory_part (ls, gen) ->
+        let gen = Int64.to_string gen in
+        data_concat (gen :: ls)
     | _ -> ok
 
   let print x tid rid = create tid rid (ty_of_payload x) (data_of_payload x)
@@ -549,7 +552,10 @@ module Request = struct
     match get_ty request with
     | Op.Read -> PathOp (data |> one_string, Read)
     | Op.Directory -> PathOp (data |> one_string, Directory)
-    | Op.Directory_part -> PathOp (data |> one_string, Directory)
+    | Op.Directory_part ->
+        let path, offset = two_strings data in
+        Directory_part (path, offset)
+    (* TODO what to do ??*)
     | Op.Reset_watches -> PathOp (data |> one_string, Directory)
     | Op.Getperms -> PathOp (data |> one_string, Getperms)
     | Op.Getdomainpath -> Getdomainpath (data |> one_string |> domid)

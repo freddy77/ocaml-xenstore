@@ -80,7 +80,7 @@ let write _t _creator perms path value =
         (Some (int_of_string value))
   | _ -> Store.Path.doesnt_exist path
 
-let list t perms path =
+let list_raw t perms path =
   Perms.has perms Perms.CONFIGURE;
   match Store.Path.to_string_list path with
   | [] ->
@@ -116,6 +116,8 @@ let list t perms path =
       Quota.list_overrides Quota.maxwatchevent_overrides
       |> List.map fst |> List.map string_of_int
   | _ -> []
+
+let list t perms path = (list_raw t perms path, Int64.one) (* TODO gen *)
 
 let rm _t perms path =
   Perms.has perms Perms.CONFIGURE;

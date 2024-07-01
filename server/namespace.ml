@@ -6,7 +6,7 @@ module type IO = sig
 
   val read : Transaction.t -> Perms.t -> Store.Path.t -> string
   val write : Transaction.t -> int -> Perms.t -> Store.Path.t -> string -> unit
-  val list : Transaction.t -> Perms.t -> Store.Path.t -> string list
+  val list : Transaction.t -> Perms.t -> Store.Path.t -> string list * int64
   val rm : Transaction.t -> Perms.t -> Store.Path.t -> unit
   val getperms : Transaction.t -> Perms.t -> Store.Path.t -> Xs_protocol.ACL.t
 
