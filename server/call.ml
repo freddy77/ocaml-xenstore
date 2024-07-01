@@ -97,14 +97,24 @@ let op_exn _store c t (payload : Request.payload) : Response.payload =
       | Setperms perms ->
           Impl.setperms t c.Connection.perm path perms;
           Response.Setperms)
-  | Directory_part (path, _offset) ->
+  | Directory_part (path, offset) ->
       let path = resolve path in
 
       let path, m = get_namespace_implementation path in
       let module Impl = (val m : Namespace.IO) in
       let entries, generation = Impl.list t c.Connection.perm path in
-      (* TODO truncate, consider offset *)
-      Response.Directory_part (entries, generation)
+      (* TODO optimize *)
+      let buf = Buffer.create 4096 in
+      (* TODO xs_wire size *)
+      let all = String.concat "\000" entries ^ "\000\000" in
+      let data =
+        let l = String.length all in
+        let gen_len = String.length (Int64.to_string generation) in
+        let to_copy = min (l - offset) (4096 - gen_len - 1) in
+        if l > offset then String.sub all offset to_copy else "\000"
+      in
+      Buffer.add_string buf data;
+      Response.Directory_part (buf, generation)
 
 (* Replay a stored transaction against a fresh store, check the responses are
    all equivalent: if so, commit the transaction. Otherwise send the abort to

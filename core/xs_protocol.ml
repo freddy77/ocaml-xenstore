@@ -382,7 +382,7 @@ module Response = struct
     | Isintroduced of bool
     | Error of string
     | Watchevent of string * string
-    | Directory_part of string list * int64
+    | Directory_part of Buffer.t * int64
 
   let prettyprint_payload =
     let open Printf in
@@ -408,8 +408,8 @@ module Response = struct
     | Isintroduced x -> sprintf "Isintroduced %b" x
     | Error x -> sprintf "Error %s" x
     | Watchevent (x, y) -> sprintf "Watchevent %s %s" x y
-    | Directory_part (xs, gen) ->
-        sprintf "Directory_part [ %s ] %Ld" (String.concat "; " xs) gen
+    | Directory_part (ls, gen) ->
+        sprintf "Directory_part %S %Ld" (Buffer.contents ls) gen
 
   let ty_of_payload = function
     | Read _ -> Op.Read
@@ -449,7 +449,7 @@ module Response = struct
     | Error x -> data_concat [ x ]
     | Directory_part (ls, gen) ->
         let gen = Int64.to_string gen in
-        data_concat (gen :: ls)
+        gen ^ "\000" ^ Buffer.contents ls
     | _ -> ok
 
   let print x tid rid = create tid rid (ty_of_payload x) (data_of_payload x)
@@ -481,7 +481,7 @@ module Request = struct
     | Isintroduced of int
     | Error of string
     | Watchevent of string
-    | Directory_part of string * string
+    | Directory_part of string * int
 
   open Printf
 
@@ -510,7 +510,8 @@ module Request = struct
     | Isintroduced x -> sprintf "Isintroduced %d" x
     | Error x -> sprintf "Error %s" x
     | Watchevent x -> sprintf "Watchevent %s" x
-    | Directory_part (x, y) -> sprintf "Directory_part %s %s" x y
+    | Directory_part (path, offset) ->
+        sprintf "Directory_part %s %d" path offset
 
   exception Parse_failure
 
@@ -530,9 +531,10 @@ module Request = struct
   let acl x =
     match ACL.of_string x with Some x -> x | None -> raise Parse_failure
 
+  let is_digit c = c >= '0' && c <= '9'
+
   let domid s =
     let v = ref 0 in
-    let is_digit c = c >= '0' && c <= '9' in
     let len = String.length s in
     let i = ref 0 in
     while !i < len && not (is_digit s.[!i]) do
@@ -545,6 +547,12 @@ module Request = struct
     done;
     !v
 
+  let offset s =
+    let l = String.length s in
+    if l < 1 || l > 9 || not (String.for_all is_digit s) then
+      raise Parse_failure;
+    Int32.to_int (Int32.of_string s)
+
   let bool = function "F" -> false | "T" -> true | _ -> raise Parse_failure
 
   let parse_exn request =
@@ -553,8 +561,9 @@ module Request = struct
     | Op.Read -> PathOp (data |> one_string, Read)
     | Op.Directory -> PathOp (data |> one_string, Directory)
     | Op.Directory_part ->
-        let path, offset = two_strings data in
-        Directory_part (path, offset)
+        let path, off = two_strings data in
+        let off = offset off in
+        Directory_part (path, off)
     (* TODO what to do ??*)
     | Op.Reset_watches -> PathOp (data |> one_string, Directory)
     | Op.Getperms -> PathOp (data |> one_string, Getperms)
@@ -659,7 +668,8 @@ module Request = struct
         data_concat [ Printf.sprintf "%u" mine; Printf.sprintf "%u" yours ]
     | Error _ -> failwith "Unimplemented: data_of_payload (Error)"
     | Watchevent _ -> failwith "Unimplemented: data_of_payload (Watchevent)"
-    | Directory_part (path, offset) -> data_concat [ path; offset ]
+    | Directory_part (path, offset) ->
+        data_concat [ path; string_of_int offset ]
 
   let print x tid rid =
     create
