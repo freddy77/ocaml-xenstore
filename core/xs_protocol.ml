@@ -218,6 +218,7 @@ let get_data pkt =
     Buffer.sub pkt.data 0 (pkt.len - 1)
   else Buffer.contents pkt.data
 
+let get_raw_data pkt = Buffer.contents pkt.data
 let get_rid pkt = pkt.rid
 
 module Parser = struct
@@ -690,6 +691,7 @@ module Unmarshal = struct
   let int32 = int32_of_string_opt ++ get_data
   let unit = unit_of_string_opt ++ get_data
   let ok = ok ++ get_data
+  let raw = some ++ get_raw_data
 end
 
 exception Enoent of string

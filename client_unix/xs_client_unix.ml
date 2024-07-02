@@ -301,14 +301,34 @@ functor
         with_mutex c.m (fun () -> Hashtbl.remove c.rid_to_wakeup rid);
         response hint request res unmarshal)
 
-    let rpc_dir hint h payload unmarshal =
-      try rpc hint h payload unmarshal with Error "E2BIG" -> [ "mao" ]
+    let directory_part h path offset =
+      rpc "directory_part" h
+        Request.(Directory_part (path, offset))
+        Unmarshal.raw
+
+    let rpc_dir hint h path unmarshal =
+      try rpc hint h Request.(PathOp (path, Directory)) unmarshal
+      with Error "E2BIG" ->
+        let rec read_part data generation =
+          let offset = String.length data in
+          let out = directory_part h path offset in
+          let i = String.index out '\000' in
+          let new_generation = String.sub out 0 i in
+          let new_data = String.sub out (i + 1) (String.length out - i - 1) in
+          if data <> "" && new_generation <> generation then read_part "" ""
+          else
+            let data = data ^ new_data in
+            let l = String.length data in
+            if l < 2 then ""
+            else if String.ends_with ~suffix:"\000\000" out then
+              String.sub out 0 (l - 2)
+            else read_part data new_generation
+        in
+        let part = read_part "" "" in
+        String.split_on_char '\000' part
 
     let directory h path =
-      rpc_dir "directory"
-        (Xs_handle.accessed_path h path)
-        Request.(PathOp (path, Directory))
-        Unmarshal.list
+      rpc_dir "directory" (Xs_handle.accessed_path h path) path Unmarshal.list
 
     let read h path =
       rpc "read"

@@ -215,6 +215,7 @@ module Unmarshal : sig
   val int32 : t -> int32 option
   val unit : t -> unit option
   val ok : t -> unit option
+  val raw : t -> string option
 end
 
 exception Enoent of string (* Raised when a named key does not exist. *)
