@@ -60,6 +60,16 @@ module Node = struct
     let childname = Symbol.of_string childname in
     List.find (fun n -> n.name = childname) node.children
 
+  let find_one_child node name =
+    (* returns (index/-1, item(opt), tail) *)
+    let rec find i l =
+      match l with
+      | [] -> (-1, None, l)
+      | h :: tl when h.name = name -> (i, Some h, tl)
+      | _ :: tl -> (find [@tailcall]) (i + 1) tl
+    in
+    find 0 node.children
+
   let replace_child node child nchild =
     (* this is the on-steroid version of the filter one-replace one *)
     let[@tail_mod_cons] rec replace_one_in_list l =
